@@ -21,27 +21,39 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export const userService = {
   // Create a new user
   async createUser(userData: CreateUserRequest): Promise<ApiResponse<UserProfile>> {
-    await delay(800); // Simulate network delay
-    
     try {
-      const newUser: UserProfile = {
-        id: Math.random().toString(36).substr(2, 9),
-        ...userData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      // Call your external API
+      const response = await fetch('https://jsonplaceholder.typicode.com/todos/1');
+      const apiData = await response.json();
       
-      mockUsers.push(newUser);
+      console.log('API Response:', apiData);
       
-      return {
-        success: true,
-        data: newUser,
-        message: 'User created successfully',
-      };
+      if (response.ok) {
+        const newUser: UserProfile = {
+          id: Math.random().toString(36).substr(2, 9),
+          ...userData,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        
+        mockUsers.push(newUser);
+        
+        return {
+          success: true,
+          data: newUser,
+          message: 'User created successfully and API called',
+        };
+      } else {
+        return {
+          success: false,
+          error: 'API call failed',
+        };
+      }
     } catch (error) {
+      console.error('API Error:', error);
       return {
         success: false,
-        error: 'Failed to create user',
+        error: 'Failed to create user and call API',
       };
     }
   },
