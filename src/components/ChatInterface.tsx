@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Bot, User, Mic, Volume2, VolumeX, Star, Trophy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { chatService } from '@/services/chatService';
 
 interface Message {
   id: string;
@@ -189,19 +190,47 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputValue;
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate AI response delay
-    setTimeout(() => {
-      const botResponse: Message = {
+    try {
+      // Send message to backend API with user profile and chat data
+      const response = await chatService.sendMessage({
+        userProfile,
+        message: currentInput,
+        language,
+      });
+
+      if (response.success && response.data) {
+        const botResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          content: `API Response: Created object with ID ${response.data.id}. Your message "${currentInput}" was sent successfully with your profile data.`,
+          sender: 'bot',
+          timestamp: new Date(),
+        };
+
+        setMessages(prev => [...prev, botResponse]);
+      } else {
+        const errorResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          content: `Error: ${response.error || 'Failed to send message to backend'}`,
+          sender: 'bot',
+          timestamp: new Date(),
+        };
+
+        setMessages(prev => [...prev, errorResponse]);
+      }
+    } catch (error) {
+      const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
-        content: generateBotResponse(inputValue),
+        content: 'Network error: Could not connect to backend API',
         sender: 'bot',
         timestamp: new Date(),
       };
 
-      setMessages(prev => [...prev, botResponse]);
+      setMessages(prev => [...prev, errorResponse]);
+    } finally {
       setIsTyping(false);
       
       // Gamification: Add points for interaction
@@ -213,7 +242,7 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
           description: `Congratulations! You've reached level ${level + 1}`,
         });
       }
-    }, 1000 + Math.random() * 2000);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
