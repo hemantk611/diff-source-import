@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useUserService } from '@/hooks/useUserService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -82,6 +83,7 @@ interface UserProfileProps {
 }
 
 export const UserProfile = ({ onProfileComplete, language }: UserProfileProps) => {
+  const { createUser, loading } = useUserService();
   const [profile, setProfile] = useState({
     name: '',
     age: '',
@@ -112,9 +114,21 @@ export const UserProfile = ({ onProfileComplete, language }: UserProfileProps) =
     }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (profile.name && profile.clientType && profile.phone) {
-      onProfileComplete(profile);
+      // Call your API to save user data
+      const savedUser = await createUser({
+        name: profile.name,
+        age: parseInt(profile.age) || 0,
+        income: 0, // Default income - you can collect this in your form later
+        goals: profile.financialGoals.join(', '),
+        riskTolerance: profile.experience === 'beginner' ? 'low' : profile.experience === 'intermediate' ? 'medium' : 'high',
+        language: language
+      });
+      
+      if (savedUser) {
+        onProfileComplete(profile);
+      }
     }
   };
 
@@ -348,9 +362,9 @@ export const UserProfile = ({ onProfileComplete, language }: UserProfileProps) =
         <Button 
           onClick={handleSubmit}
           className="w-full"
-          disabled={!profile.name || !profile.clientType || !profile.phone}
+          disabled={!profile.name || !profile.clientType || !profile.phone || loading}
         >
-          {getTranslation('startJourney')}
+          {loading ? 'Saving...' : getTranslation('startJourney')}
         </Button>
       </CardContent>
     </Card>
