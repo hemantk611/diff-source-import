@@ -10,7 +10,13 @@ export interface ChatResponse {
     id: string;
     name: string;
     data: {
-      reply: string;
+      reply?: string;
+      content?: any;
+      type?: 'text' | 'audio' | 'document' | 'image' | 'table' | 'list' | 'file';
+      fileUrl?: string;
+      fileName?: string;
+      mimeType?: string;
+      metadata?: any;
     };
   };
   message?: string;

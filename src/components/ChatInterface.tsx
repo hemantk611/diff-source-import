@@ -5,8 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Send, Bot, User, Mic, Volume2, VolumeX, Star, Trophy, Table as TableIcon, FileText } from 'lucide-react';
+import { Send, Bot, User, Mic, Volume2, VolumeX, Star, Trophy, Download, Play, Pause, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { chatService } from '@/services/chatService';
 
@@ -15,9 +14,11 @@ interface Message {
   content: string;
   sender: 'user' | 'bot';
   timestamp: Date;
-  type?: 'text' | 'goal' | 'achievement';
-  displayFormat?: 'paragraph' | 'table' | 'raw';
-  htmlContent?: string;
+  type?: 'text' | 'audio' | 'document' | 'image' | 'table' | 'list' | 'file';
+  fileUrl?: string;
+  fileName?: string;
+  mimeType?: string;
+  metadata?: any;
 }
 
 interface ChatInterfaceProps {
@@ -33,7 +34,7 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
   const [isListening, setIsListening] = useState(false);
   const [points, setPoints] = useState(0);
   const [level, setLevel] = useState(1);
-  const [defaultDisplayFormat, setDefaultDisplayFormat] = useState<'paragraph' | 'table'>('paragraph');
+  const [isPlaying, setIsPlaying] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
@@ -123,65 +124,72 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
     return messages[language] || messages.en;
   };
 
-  const generateBotResponse = (userMessage: string): string => {
-    const responses = {
-      en: {
-        savings: "Great question about savings! Based on your profile, I recommend starting with an emergency fund covering 3-6 months of expenses. Would you like specific strategies for your situation?",
-        investment: "For investment guidance, considering your experience level, let's start with diversified index funds. They're perfect for building long-term wealth with lower risk.",
-        debt: "Debt management is crucial! I suggest the avalanche method - pay minimums on all debts, then focus extra payments on the highest interest rate debt first.",
-        budget: "Budgeting is the foundation of financial health! Try the 50/30/20 rule: 50% needs, 30% wants, 20% savings and debt repayment.",
-        default: "That's a great question! Based on your profile as a " + userProfile.clientType + ", I'd be happy to provide personalized guidance. Could you be more specific about what you'd like to know?"
-      },
-      hi: {
-        savings: "बचत के बारे में बेहतरीन सवाल! आपकी प्रोफाइल के आधार पर, मैं 3-6 महीने के खर्च को कवर करने वाले इमरजेंसी फंड से शुरुआत करने की सलाह देता हूं। क्या आप अपनी स्थिति के लिए विशिष्ट रणनीतियां चाहते हैं?",
-        investment: "निवेश मार्गदर्शन के लिए, आपके अनुभव स्तर को देखते हुए, आइए विविधीकृत इंडेक्स फंड से शुरुआत करते हैं। ये कम जोखिम के साथ दीर्घकालिक संपत्ति निर्माण के लिए बेहतरीन हैं।",
-        debt: "ऋण प्रबंधन महत्वपूर्ण है! मैं एवलांच मेथड का सुझाव देता हूं - सभी ऋणों पर न्यूनतम भुगतान करें, फिर सबसे अधिक ब्याज दर वाले ऋण पर अतिरिक्त भुगतान पर ध्यान दें।",
-        budget: "बजटिंग वित्तीय स्वास्थ्य की नींव है! 50/30/20 नियम आजमाएं: 50% जरूरतें, 30% इच्छाएं, 20% बचत और ऋण चुकौती।",
-        default: "यह एक बेहतरीन सवाल है! " + userProfile.clientType + " के रूप में आपकी प्रोफाइल के आधार पर, मैं व्यक्तिगत मार्गदर्शन प्रदान करने में खुश हूं। क्या आप और विशिष्ट हो सकते हैं कि आप क्या जानना चाहते हैं?"
-      }
-    };
-
-    const langResponses = responses[language] || responses.en;
+  const detectResponseType = (responseData: any): 'text' | 'audio' | 'document' | 'image' | 'table' | 'list' | 'file' => {
+    if (!responseData) return 'text';
     
-    // Hindi keyword detection
-    const hindiKeywords = {
-      savings: ['बचत', 'सेव', 'पैसे बचाना'],
-      investment: ['निवेश', 'इन्वेस्टमेंट', 'शेयर'],
-      debt: ['कर्ज', 'ऋण', 'लोन'],
-      budget: ['बजट', 'खर्च', 'हिसाब']
-    };
+    // Check explicit type from server
+    if (responseData.type) return responseData.type;
     
-    const messageLower = userMessage.toLowerCase();
-    
-    if (language === 'hi') {
-      if (hindiKeywords.savings.some(keyword => messageLower.includes(keyword)) || messageLower.includes('save')) {
-        return langResponses.savings || langResponses.default;
+    // Check for file-related properties
+    if (responseData.fileUrl || responseData.fileName) {
+      if (responseData.mimeType) {
+        if (responseData.mimeType.startsWith('audio/')) return 'audio';
+        if (responseData.mimeType.startsWith('image/')) return 'image';
+        if (responseData.mimeType.includes('pdf') || responseData.mimeType.includes('document')) return 'document';
       }
-      if (hindiKeywords.investment.some(keyword => messageLower.includes(keyword)) || messageLower.includes('invest')) {
-        return langResponses.investment || langResponses.default;
-      }
-      if (hindiKeywords.debt.some(keyword => messageLower.includes(keyword)) || messageLower.includes('debt')) {
-        return langResponses.debt || langResponses.default;
-      }
-      if (hindiKeywords.budget.some(keyword => messageLower.includes(keyword)) || messageLower.includes('budget')) {
-        return langResponses.budget || langResponses.default;
-      }
-    } else {
-      if (messageLower.includes('savings') || messageLower.includes('save')) {
-        return langResponses.savings || langResponses.default;
-      }
-      if (messageLower.includes('invest') || messageLower.includes('investment')) {
-        return langResponses.investment || langResponses.default;
-      }
-      if (messageLower.includes('debt') || messageLower.includes('loan')) {
-        return langResponses.debt || langResponses.default;
-      }
-      if (messageLower.includes('budget') || messageLower.includes('spending')) {
-        return langResponses.budget || langResponses.default;
-      }
+      return 'file';
     }
     
-    return langResponses.default;
+    // Check content structure
+    const content = responseData.reply || responseData.content;
+    if (typeof content === 'object') {
+      if (Array.isArray(content)) return 'list';
+      if (content.headers || content.rows) return 'table';
+    }
+    
+    // Check text patterns for table-like structure
+    if (typeof content === 'string') {
+      const lines = content.split('\n').filter(line => line.trim());
+      const colonCount = lines.filter(line => line.includes(':')).length;
+      if (colonCount >= 3 && lines.length > 3) return 'table';
+    }
+    
+    return 'text';
+  };
+
+  const handlePlayAudio = async (messageId: string, audioUrl: string) => {
+    try {
+      if (isPlaying[messageId]) {
+        setIsPlaying(prev => ({ ...prev, [messageId]: false }));
+        return;
+      }
+      
+      const audio = new Audio(audioUrl);
+      setIsPlaying(prev => ({ ...prev, [messageId]: true }));
+      
+      audio.onended = () => {
+        setIsPlaying(prev => ({ ...prev, [messageId]: false }));
+      };
+      
+      await audio.play();
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      toast({
+        title: "Audio Error",
+        description: "Could not play audio file",
+        variant: "destructive",
+      });
+      setIsPlaying(prev => ({ ...prev, [messageId]: false }));
+    }
+  };
+
+  const handleDownloadFile = (fileUrl: string, fileName: string) => {
+    const link = document.createElement('a');
+    link.href = fileUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleSendMessage = async () => {
@@ -208,15 +216,19 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
       });
 
       if (response.success && response.data) {
-        const apiResponse = response.data.data?.reply || `API Response: Created object with ID ${response.data.id}. Your message "${currentInput}" was sent successfully with your profile data.`;
+        const responseData = response.data.data;
+        const content = responseData?.reply || responseData?.content || `API Response: Created object with ID ${response.data.id}. Your message "${currentInput}" was sent successfully with your profile data.`;
         
         const botResponse: Message = {
           id: (Date.now() + 1).toString(),
-          content: apiResponse,
+          content: typeof content === 'string' ? content : JSON.stringify(content),
           sender: 'bot',
           timestamp: new Date(),
-          displayFormat: defaultDisplayFormat,
-          htmlContent: formatResponseAsHTML(apiResponse, defaultDisplayFormat),
+          type: detectResponseType(responseData),
+          fileUrl: responseData?.fileUrl,
+          fileName: responseData?.fileName,
+          mimeType: responseData?.mimeType,
+          metadata: responseData?.metadata,
         };
 
         setMessages(prev => [...prev, botResponse]);
@@ -269,86 +281,146 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
     });
   };
 
-  const formatResponseAsHTML = (content: string, format: 'paragraph' | 'table'): string => {
-    if (format === 'table') {
-      // Try to parse response as structured data for table format
-      const lines = content.split('\n').filter(line => line.trim());
-      if (lines.length > 1) {
-        return `
-          <table className="w-full border-collapse border border-border">
-            <thead>
-              <tr>
-                <th className="border border-border p-2 text-left">Information</th>
-                <th className="border border-border p-2 text-left">Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${lines.map((line, index) => {
-                const parts = line.split(':');
-                if (parts.length > 1) {
-                  return `<tr key=${index}>
-                    <td className="border border-border p-2 font-medium">${parts[0].trim()}</td>
-                    <td className="border border-border p-2">${parts.slice(1).join(':').trim()}</td>
-                  </tr>`;
-                } else {
-                  return `<tr key=${index}>
-                    <td className="border border-border p-2" colspan="2">${line}</td>
-                  </tr>`;
-                }
-              }).join('')}
-            </tbody>
-          </table>
-        `;
-      }
+  const renderMessageContent = (message: Message) => {
+    switch (message.type) {
+      case 'table':
+        return renderTableContent(message);
+      
+      case 'list':
+        return renderListContent(message);
+      
+      case 'audio':
+        return (
+          <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handlePlayAudio(message.id, message.fileUrl!)}
+              className="h-8 w-8 p-0"
+            >
+              {isPlaying[message.id] ? (
+                <Pause className="h-4 w-4" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+            </Button>
+            <div className="flex-1">
+              <p className="text-sm font-medium">{message.fileName || 'Audio Message'}</p>
+              <p className="text-xs text-muted-foreground">Click to play</p>
+            </div>
+          </div>
+        );
+      
+      case 'image':
+        return (
+          <div className="space-y-2">
+            {message.content && <p className="text-sm">{message.content}</p>}
+            <div className="relative">
+              <img 
+                src={message.fileUrl} 
+                alt={message.fileName || 'Image'} 
+                className="max-w-full h-auto rounded-lg"
+              />
+            </div>
+          </div>
+        );
+      
+      case 'document':
+      case 'file':
+        return (
+          <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-lg">
+            <div className="h-8 w-8 bg-primary/10 rounded flex items-center justify-center">
+              <FileText className="h-4 w-4 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium">{message.fileName || 'Download File'}</p>
+              <p className="text-xs text-muted-foreground">{message.mimeType}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDownloadFile(message.fileUrl!, message.fileName!)}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+          </div>
+        );
+      
+      default:
+        return <p className="text-sm whitespace-pre-wrap">{message.content}</p>;
     }
-    
-    // Default paragraph format
-    return `<div className="space-y-2">${content.split('\n').map((line, index) => 
-      `<p key=${index} className="text-sm">${line}</p>`
-    ).join('')}</div>`;
   };
 
-  const renderMessageContent = (message: Message) => {
-    if (message.sender === 'bot' && message.htmlContent && message.displayFormat) {
-      if (message.displayFormat === 'table') {
-        // Parse structured data for table display
-        const lines = message.content.split('\n').filter(line => line.trim());
-        if (lines.length > 1) {
-          return (
-            <Table className="w-full text-sm">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Information</TableHead>
-                  <TableHead>Details</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lines.map((line, index) => {
-                  const parts = line.split(':');
-                  if (parts.length > 1) {
-                    return (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{parts[0].trim()}</TableCell>
-                        <TableCell>{parts.slice(1).join(':').trim()}</TableCell>
-                      </TableRow>
-                    );
-                  } else {
-                    return (
-                      <TableRow key={index}>
-                        <TableCell colSpan={2}>{line}</TableCell>
-                      </TableRow>
-                    );
-                  }
-                })}
-              </TableBody>
-            </Table>
-          );
-        }
+  const renderTableContent = (message: Message) => {
+    try {
+      const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
+      const lines = content.split('\n').filter(line => line.trim());
+      
+      if (lines.length > 1) {
+        return (
+          <Table className="w-full text-sm">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Field</TableHead>
+                <TableHead>Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lines.map((line, index) => {
+                const parts = line.split(':');
+                if (parts.length > 1) {
+                  return (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">{parts[0].trim()}</TableCell>
+                      <TableCell>{parts.slice(1).join(':').trim()}</TableCell>
+                    </TableRow>
+                  );
+                } else {
+                  return (
+                    <TableRow key={index}>
+                      <TableCell colSpan={2}>{line}</TableCell>
+                    </TableRow>
+                  );
+                }
+              })}
+            </TableBody>
+          </Table>
+        );
       }
+    } catch (error) {
+      console.error('Error rendering table:', error);
     }
     
-    // Default text rendering
     return <p className="text-sm">{message.content}</p>;
+  };
+
+  const renderListContent = (message: Message) => {
+    try {
+      let items: any[] = [];
+      
+      if (typeof message.content === 'string') {
+        items = message.content.split('\n').filter(line => line.trim());
+      } else if (Array.isArray(message.content)) {
+        items = message.content;
+      } else {
+        return <p className="text-sm">{JSON.stringify(message.content)}</p>;
+      }
+      
+      return (
+        <ul className="space-y-1 text-sm">
+          {items.map((item, index) => (
+            <li key={index} className="flex items-start gap-2">
+              <span className="text-primary">•</span>
+              <span>{typeof item === 'string' ? item : JSON.stringify(item)}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    } catch (error) {
+      console.error('Error rendering list:', error);
+      return <p className="text-sm">{message.content}</p>;
+    }
   };
 
   const startVoiceRecognition = () => {
@@ -394,131 +466,126 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
               <Trophy className="h-4 w-4 text-secondary" />
               <span className="text-sm font-medium">Level {level}</span>
             </div>
-            <Select value={defaultDisplayFormat} onValueChange={(value: 'paragraph' | 'table') => setDefaultDisplayFormat(value)}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="paragraph">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Text
-                  </div>
-                </SelectItem>
-                <SelectItem value="table">
-                  <div className="flex items-center gap-2">
-                    <TableIcon className="h-4 w-4" />
-                    Table
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
             <Button
               variant="ghost"
               size="sm"
               onClick={toggleSpeech}
+              className="h-8 w-8 p-0"
               aria-label={isSpeechEnabled ? "Disable speech" : "Enable speech"}
             >
-              {isSpeechEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              {isSpeechEnabled ? (
+                <Volume2 className="h-4 w-4" />
+              ) : (
+                <VolumeX className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Chat messages */}
       <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
+        <div className="space-y-4 max-w-4xl mx-auto">
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex gap-3 ${
+                message.sender === 'user' ? 'justify-end' : 'justify-start'
+              }`}
             >
-              <div className={`flex gap-3 max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                  message.sender === 'user' ? 'bg-primary' : 'bg-secondary'
-                }`}>
-                  {message.sender === 'user' ? (
-                    <User className="h-4 w-4 text-primary-foreground" />
-                  ) : (
-                    <Bot className="h-4 w-4 text-secondary-foreground" />
-                  )}
+              {message.sender === 'bot' && (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary">
+                  <Bot className="h-4 w-4 text-white" />
                 </div>
-                
-                <Card className={`${
-                  message.sender === 'user' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-card'
-                }`}>
-                  <CardContent className="p-3">
-                    {renderMessageContent(message)}
-                    <span className="text-xs opacity-70 mt-1 block">
+              )}
+              
+              <Card className={`max-w-md ${message.sender === 'user' ? 'bg-primary text-primary-foreground' : ''}`}>
+                <CardContent className="p-3">
+                  {renderMessageContent(message)}
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-xs opacity-70">
                       {message.timestamp.toLocaleTimeString()}
                     </span>
-                  </CardContent>
-                </Card>
-              </div>
+                    {message.type && message.type !== 'text' && (
+                      <Badge variant="secondary" className="text-xs">
+                        {message.type}
+                      </Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {message.sender === 'user' && (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent">
+                  <User className="h-4 w-4 text-accent-foreground" />
+                </div>
+              )}
             </div>
           ))}
           
           {isTyping && (
-            <div className="flex justify-start">
-              <div className="flex gap-3 max-w-[80%]">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary">
-                  <Bot className="h-4 w-4 text-secondary-foreground" />
-                </div>
-                <Card className="bg-card">
-                  <CardContent className="p-3">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                  </CardContent>
-                </Card>
+            <div className="flex gap-3 justify-start">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary">
+                <Bot className="h-4 w-4 text-white" />
               </div>
+              <Card>
+                <CardContent className="p-3">
+                  <div className="flex space-x-1">
+                    <div className="h-2 w-2 bg-current rounded-full animate-bounce"></div>
+                    <div className="h-2 w-2 bg-current rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                    <div className="h-2 w-2 bg-current rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
+          
+          <div ref={messagesEndRef} />
         </div>
-        <div ref={messagesEndRef} />
       </ScrollArea>
 
-      {/* Input */}
+      {/* Input area */}
       <div className="border-t bg-card p-4">
-        <div className="flex gap-2">
-          <Input
-            placeholder={language === 'hi' ? 'अपना प्रश्न टाइप करें...' : 'Type your question...'}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            className="flex-1"
-            aria-label="Message input"
-          />
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={startVoiceRecognition}
-            disabled={isListening}
-            className={isListening ? 'bg-red-500 hover:bg-red-600 text-white' : ''}
-            aria-label={isListening ? "Stop recording" : "Start voice input"}
-          >
-            <Mic className={`h-4 w-4 ${isListening ? 'animate-pulse' : ''}`} />
-          </Button>
-          <Button onClick={handleSendMessage} disabled={!inputValue.trim()}>
-            <Send className="h-4 w-4" />
-            <span className="sr-only">Send message</span>
-          </Button>
-        </div>
-        
-        <div className="flex flex-wrap gap-2 mt-3">
-          <Badge variant="outline" className="cursor-pointer hover:bg-primary-light" onClick={() => setInputValue(language === 'hi' ? "मैं पैसे कैसे बचाना शुरू कर सकता हूं?" : "How can I start saving money?")}>
-            💰 {language === 'hi' ? 'बचत टिप्स' : 'Savings Tips'}
-          </Badge>
-          <Badge variant="outline" className="cursor-pointer hover:bg-primary-light" onClick={() => setInputValue(language === 'hi' ? "आप कौन से निवेश विकल्प सुझाते हैं?" : "What investment options do you recommend?")}>
-            📈 {language === 'hi' ? 'निवेश सहायता' : 'Investment Help'}
-          </Badge>
-          <Badge variant="outline" className="cursor-pointer hover:bg-primary-light" onClick={() => setInputValue(language === 'hi' ? "मुझे बजट बनाने में मदद करें" : "Help me create a budget")}>
-            📊 {language === 'hi' ? 'बजटिंग' : 'Budgeting'}
-          </Badge>
+        <div className="max-w-4xl mx-auto">
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <Input
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder={language === 'hi' ? 'अपना सवाल पूछें...' : 'Ask your financial question...'}
+                className="resize-none"
+                disabled={isTyping}
+              />
+            </div>
+            
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={startVoiceRecognition}
+              className={isListening ? 'bg-destructive text-destructive-foreground' : ''}
+              disabled={isTyping}
+            >
+              <Mic className="h-4 w-4" />
+            </Button>
+            
+            <Button 
+              onClick={handleSendMessage} 
+              disabled={!inputValue.trim() || isTyping}
+              className="px-6"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {language === 'hi' ? 'भेजें' : 'Send'}
+            </Button>
+          </div>
+          
+          {isListening && (
+            <div className="mt-2 text-center">
+              <Badge variant="destructive" className="animate-pulse">
+                🎤 {language === 'hi' ? 'सुन रहा है...' : 'Listening...'}
+              </Badge>
+            </div>
+          )}
         </div>
       </div>
     </div>
