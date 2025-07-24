@@ -14,7 +14,7 @@ const Welcome = () => {
     const translations = {
       en: {
         tagline: "Your trusted AI financial coach",
-        hero_title: "Empowering Diverse Communities with Financial Wisdom",
+        hero_title: "Your Personalized Financial Journey Starts Here",
         hero_description: "Join thousands of users who've transformed their financial future with FinBuddy's personalized coaching.",
         feature_inclusive: "Inclusive",
         feature_inclusive_desc: "Designed for all backgrounds and financial literacy levels",
