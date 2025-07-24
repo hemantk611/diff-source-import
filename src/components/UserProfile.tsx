@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { User, Target, Users, Accessibility } from 'lucide-react';
+import { PolicyConsentDialog } from '@/components/PolicyConsentDialog';
 
 const clientTypes = [
   { id: 'farmer', name: { en: 'Farmer', hi: 'किसान' }, icon: '🌾', description: { en: 'Plan crop loans, KCC, Schemes', hi: 'फसल ऋण, केसीसी, योजनाएं' } },
@@ -84,6 +85,7 @@ interface UserProfileProps {
 
 export const UserProfile = ({ onProfileComplete, language }: UserProfileProps) => {
   const { createUser, loading } = useUserService();
+  const [showConsent, setShowConsent] = useState(false);
   const [profile, setProfile] = useState({
     name: '',
     age: '',
@@ -114,21 +116,26 @@ export const UserProfile = ({ onProfileComplete, language }: UserProfileProps) =
     }));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (profile.name && profile.clientType && profile.phone) {
-      // Call your API to save user data
-      const savedUser = await createUser({
-        name: profile.name,
-        age: parseInt(profile.age) || 0,
-        income: 0, // Default income - you can collect this in your form later
-        goals: profile.financialGoals.join(', '),
-        riskTolerance: profile.experience === 'beginner' ? 'low' : profile.experience === 'intermediate' ? 'medium' : 'high',
-        language: language
-      });
-      
-      if (savedUser) {
-        onProfileComplete(profile);
-      }
+      setShowConsent(true);
+    }
+  };
+
+  const handleConsentAccept = async () => {
+    // Call your API to save user data
+    const savedUser = await createUser({
+      name: profile.name,
+      age: parseInt(profile.age) || 0,
+      income: 0, // Default income - you can collect this in your form later
+      goals: profile.financialGoals.join(', '),
+      riskTolerance: profile.experience === 'beginner' ? 'low' : profile.experience === 'intermediate' ? 'medium' : 'high',
+      language: language
+    });
+    
+    if (savedUser) {
+      setShowConsent(false);
+      onProfileComplete(profile);
     }
   };
 
@@ -367,6 +374,14 @@ export const UserProfile = ({ onProfileComplete, language }: UserProfileProps) =
           {loading ? 'Saving...' : getTranslation('startJourney')}
         </Button>
       </CardContent>
+
+      <PolicyConsentDialog
+        open={showConsent}
+        onOpenChange={setShowConsent}
+        onAccept={handleConsentAccept}
+        userProfile={profile}
+        language={language}
+      />
     </Card>
   );
 };

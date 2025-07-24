@@ -22,8 +22,14 @@ export const userService = {
   // Create a new user
   async createUser(userData: CreateUserRequest): Promise<ApiResponse<UserProfile>> {
     try {
-      // Call your external API
-      const response = await fetch('https://jsonplaceholder.typicode.com/todos/1');
+      // Call your external API with POST request
+      const response = await fetch('https://jsonplaceholder.typicode.com/todos/1', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
       const apiData = await response.json();
       
       console.log('API Response:', apiData);
