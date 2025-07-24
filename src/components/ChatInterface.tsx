@@ -14,7 +14,7 @@ interface Message {
   content: string;
   sender: 'user' | 'bot';
   timestamp: Date;
-  type?: 'text' | 'audio' | 'document' | 'image' | 'table' | 'list' | 'file';
+  type?: 'text' | 'audio' | 'document' | 'image' | 'table' | 'list' | 'file' | 'html';
   fileUrl?: string;
   fileName?: string;
   mimeType?: string;
@@ -124,7 +124,7 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
     return messages[language] || messages.en;
   };
 
-  const detectResponseType = (responseData: any): 'text' | 'audio' | 'document' | 'image' | 'table' | 'list' | 'file' => {
+  const detectResponseType = (responseData: any): 'text' | 'audio' | 'document' | 'image' | 'table' | 'list' | 'file' | 'html' => {
     if (!responseData) return 'text';
     
     // Check explicit type from server
@@ -345,6 +345,14 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
               Download
             </Button>
           </div>
+        );
+      
+      case 'html':
+        return (
+          <div 
+            className="text-sm prose prose-sm max-w-none"
+            dangerouslySetInnerHTML={{ __html: message.content }}
+          />
         );
       
       default:
