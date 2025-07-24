@@ -4,7 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Mic, Volume2, VolumeX, Star, Trophy } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Send, Bot, User, Mic, Volume2, VolumeX, Star, Trophy, Table as TableIcon, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { chatService } from '@/services/chatService';
 
@@ -14,6 +16,8 @@ interface Message {
   sender: 'user' | 'bot';
   timestamp: Date;
   type?: 'text' | 'goal' | 'achievement';
+  displayFormat?: 'paragraph' | 'table' | 'raw';
+  htmlContent?: string;
 }
 
 interface ChatInterfaceProps {
@@ -29,6 +33,7 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
   const [isListening, setIsListening] = useState(false);
   const [points, setPoints] = useState(0);
   const [level, setLevel] = useState(1);
+  const [defaultDisplayFormat, setDefaultDisplayFormat] = useState<'paragraph' | 'table'>('paragraph');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
@@ -203,11 +208,15 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
       });
 
       if (response.success && response.data) {
+        const apiResponse = response.data.data?.reply || `API Response: Created object with ID ${response.data.id}. Your message "${currentInput}" was sent successfully with your profile data.`;
+        
         const botResponse: Message = {
           id: (Date.now() + 1).toString(),
-          content: `API Response: Created object with ID ${response.data.id}. Your message "${currentInput}" was sent successfully with your profile data.`,
+          content: apiResponse,
           sender: 'bot',
           timestamp: new Date(),
+          displayFormat: defaultDisplayFormat,
+          htmlContent: formatResponseAsHTML(apiResponse, defaultDisplayFormat),
         };
 
         setMessages(prev => [...prev, botResponse]);
@@ -260,6 +269,88 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
     });
   };
 
+  const formatResponseAsHTML = (content: string, format: 'paragraph' | 'table'): string => {
+    if (format === 'table') {
+      // Try to parse response as structured data for table format
+      const lines = content.split('\n').filter(line => line.trim());
+      if (lines.length > 1) {
+        return `
+          <table className="w-full border-collapse border border-border">
+            <thead>
+              <tr>
+                <th className="border border-border p-2 text-left">Information</th>
+                <th className="border border-border p-2 text-left">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${lines.map((line, index) => {
+                const parts = line.split(':');
+                if (parts.length > 1) {
+                  return `<tr key=${index}>
+                    <td className="border border-border p-2 font-medium">${parts[0].trim()}</td>
+                    <td className="border border-border p-2">${parts.slice(1).join(':').trim()}</td>
+                  </tr>`;
+                } else {
+                  return `<tr key=${index}>
+                    <td className="border border-border p-2" colspan="2">${line}</td>
+                  </tr>`;
+                }
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+    }
+    
+    // Default paragraph format
+    return `<div className="space-y-2">${content.split('\n').map((line, index) => 
+      `<p key=${index} className="text-sm">${line}</p>`
+    ).join('')}</div>`;
+  };
+
+  const renderMessageContent = (message: Message) => {
+    if (message.sender === 'bot' && message.htmlContent && message.displayFormat) {
+      if (message.displayFormat === 'table') {
+        // Parse structured data for table display
+        const lines = message.content.split('\n').filter(line => line.trim());
+        if (lines.length > 1) {
+          return (
+            <Table className="w-full text-sm">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Information</TableHead>
+                  <TableHead>Details</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {lines.map((line, index) => {
+                  const parts = line.split(':');
+                  if (parts.length > 1) {
+                    return (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{parts[0].trim()}</TableCell>
+                        <TableCell>{parts.slice(1).join(':').trim()}</TableCell>
+                      </TableRow>
+                    );
+                  } else {
+                    return (
+                      <TableRow key={index}>
+                        <TableCell colSpan={2}>{line}</TableCell>
+                      </TableRow>
+                    );
+                  }
+                })}
+              </TableBody>
+            </Table>
+          );
+        }
+      }
+    }
+    
+    // Default text rendering
+    return <p className="text-sm">{message.content}</p>;
+  };
+
   const startVoiceRecognition = () => {
     if (!recognitionRef.current) {
       toast({
@@ -303,6 +394,25 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
               <Trophy className="h-4 w-4 text-secondary" />
               <span className="text-sm font-medium">Level {level}</span>
             </div>
+            <Select value={defaultDisplayFormat} onValueChange={(value: 'paragraph' | 'table') => setDefaultDisplayFormat(value)}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="paragraph">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Text
+                  </div>
+                </SelectItem>
+                <SelectItem value="table">
+                  <div className="flex items-center gap-2">
+                    <TableIcon className="h-4 w-4" />
+                    Table
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               variant="ghost"
               size="sm"
@@ -340,7 +450,7 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
                     : 'bg-card'
                 }`}>
                   <CardContent className="p-3">
-                    <p className="text-sm">{message.content}</p>
+                    {renderMessageContent(message)}
                     <span className="text-xs opacity-70 mt-1 block">
                       {message.timestamp.toLocaleTimeString()}
                     </span>
