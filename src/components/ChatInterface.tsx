@@ -362,45 +362,78 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
 
   const renderTableContent = (message: Message) => {
     try {
-      const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
-      const lines = content.split('\n').filter(line => line.trim());
+      let tableData: any;
       
-      if (lines.length > 1) {
-        return (
-          <Table className="w-full text-sm">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Field</TableHead>
-                <TableHead>Value</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lines.map((line, index) => {
-                const parts = line.split(':');
-                if (parts.length > 1) {
-                  return (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{parts[0].trim()}</TableCell>
-                      <TableCell>{parts.slice(1).join(':').trim()}</TableCell>
-                    </TableRow>
-                  );
-                } else {
-                  return (
-                    <TableRow key={index}>
-                      <TableCell colSpan={2}>{line}</TableCell>
-                    </TableRow>
-                  );
-                }
-              })}
-            </TableBody>
-          </Table>
-        );
+      // Parse content if it's a string
+      if (typeof message.content === 'string') {
+        try {
+          tableData = JSON.parse(message.content);
+        } catch {
+          // If not JSON, treat as plain text
+          return <p className="text-sm">{message.content}</p>;
+        }
+      } else {
+        tableData = message.content;
       }
+      
+      // Handle structured table data with headers and rows
+      if (tableData && typeof tableData === 'object') {
+        // Format 1: { headers: [...], rows: [[...], [...]] }
+        if (tableData.headers && tableData.rows) {
+          return (
+            <Table className="w-full text-sm">
+              <TableHeader>
+                <TableRow>
+                  {tableData.headers.map((header: string, index: number) => (
+                    <TableHead key={index}>{header}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tableData.rows.map((row: any[], rowIndex: number) => (
+                  <TableRow key={rowIndex}>
+                    {row.map((cell: any, cellIndex: number) => (
+                      <TableCell key={cellIndex}>{String(cell)}</TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          );
+        }
+        
+        // Format 2: Array of objects [{ col1: val1, col2: val2 }, ...]
+        if (Array.isArray(tableData) && tableData.length > 0 && typeof tableData[0] === 'object') {
+          const headers = Object.keys(tableData[0]);
+          return (
+            <Table className="w-full text-sm">
+              <TableHeader>
+                <TableRow>
+                  {headers.map((header: string, index: number) => (
+                    <TableHead key={index}>{header}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tableData.map((row: any, rowIndex: number) => (
+                  <TableRow key={rowIndex}>
+                    {headers.map((header: string, cellIndex: number) => (
+                      <TableCell key={cellIndex}>{String(row[header] || '')}</TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          );
+        }
+      }
+      
+      // Fallback to text display
+      return <p className="text-sm">{typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}</p>;
     } catch (error) {
       console.error('Error rendering table:', error);
+      return <p className="text-sm">{String(message.content)}</p>;
     }
-    
-    return <p className="text-sm">{message.content}</p>;
   };
 
   const renderListContent = (message: Message) => {
