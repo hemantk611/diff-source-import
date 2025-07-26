@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChatPopup } from '@/components/ChatPopup';
 import { authService } from '@/services/authService';
+import { goalService } from '@/services/goalService';
 import { GoalPlan, User } from '@/types/auth';
 import { MessageCircle } from 'lucide-react';
 
@@ -16,26 +17,8 @@ const Dashboard = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [user, setUser] = useState<User | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [goalPlans] = useState<GoalPlan[]>([
-    {
-      user_goal: 'Retirement Planning',
-      action_plan_name: '401k Optimization',
-      plan_duration: '30 years',
-      status: 'Active'
-    },
-    {
-      user_goal: 'Emergency Fund',
-      action_plan_name: 'High-Yield Savings',
-      plan_duration: '6 months',
-      status: 'In Progress'
-    },
-    {
-      user_goal: 'Investment Growth',
-      action_plan_name: 'Diversified Portfolio',
-      plan_duration: '10 years',
-      status: 'Planning'
-    }
-  ]);
+  const [goalPlans, setGoalPlans] = useState<GoalPlan[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,8 +31,21 @@ const Dashboard = () => {
     if (currentUser) {
       setUser(currentUser);
       setSelectedLanguage(currentUser.language || 'en');
+      loadGoalPlans(currentUser.id);
     }
   }, [navigate]);
+
+  const loadGoalPlans = async (userId: string) => {
+    try {
+      setLoading(true);
+      const plans = await goalService.getGoalPlans(userId);
+      setGoalPlans(plans);
+    } catch (error) {
+      console.error('Failed to load goal plans:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getTranslation = (key: string) => {
     const translations: Record<string, Record<string, string>> = {
@@ -149,19 +145,25 @@ const Dashboard = () => {
             <CardTitle>{getTranslation('goalActionPlan')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="ag-theme-alpine" style={{ height: '400px', width: '100%' }}>
-              <AgGridReact
-                rowData={goalPlans}
-                columnDefs={columnDefs}
-                pagination={true}
-                paginationPageSize={10}
-                defaultColDef={{
-                  sortable: true,
-                  filter: true,
-                  resizable: true,
-                }}
-              />
-            </div>
+            {loading ? (
+              <div className="flex items-center justify-center h-96">
+                <div className="text-lg text-gray-600">Loading goal plans...</div>
+              </div>
+            ) : (
+              <div className="ag-theme-alpine" style={{ height: '400px', width: '100%' }}>
+                <AgGridReact
+                  rowData={goalPlans}
+                  columnDefs={columnDefs}
+                  pagination={true}
+                  paginationPageSize={10}
+                  defaultColDef={{
+                    sortable: true,
+                    filter: true,
+                    resizable: true,
+                  }}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
