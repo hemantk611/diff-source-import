@@ -162,7 +162,7 @@ const Index = () => {
       {/* Chat Interface */}
       <div className="flex-1 container mx-auto p-4">
         <div className="h-full max-w-4xl mx-auto">
-          <ChatInterface userProfile={userProfile} language={selectedLanguage} />
+          <ChatInterface userProfile={userProfile} selectedLanguage={selectedLanguage} />
         </div>
       </div>
     </div>

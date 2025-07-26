@@ -23,10 +23,10 @@ interface Message {
 
 interface ChatInterfaceProps {
   userProfile: any;
-  language: string;
+  selectedLanguage: string;
 }
 
-export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => {
+export const ChatInterface = ({ userProfile, selectedLanguage }: ChatInterfaceProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -52,7 +52,7 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
       timestamp: new Date(),
     };
     setMessages([welcomeMessage]);
-  }, [userProfile, language]);
+  }, [userProfile, selectedLanguage]);
 
   useEffect(() => {
     scrollToBottom();
@@ -72,7 +72,7 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
         en: 'en-US',
         hi: 'hi-IN',
       };
-      recognitionRef.current.lang = languageMap[language] || 'en-US';
+      recognitionRef.current.lang = languageMap[selectedLanguage] || 'en-US';
 
       recognitionRef.current.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
@@ -94,7 +94,7 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
         setIsListening(false);
       };
     }
-  }, [language, toast]);
+  }, [selectedLanguage, toast]);
 
   const getWelcomeMessage = () => {
     const messages = {
@@ -121,7 +121,7 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
         return goalMap[goal];
       }).join(', ')} में मदद करने के लिए यहां हूं। आज मैं आपकी कैसे सहायता कर सकता हूं?`,
     };
-    return messages[language] || messages.en;
+    return messages[selectedLanguage] || messages.en;
   };
 
   const detectResponseType = (responseData: any): 'text' | 'audio' | 'document' | 'image' | 'table' | 'list' | 'file' | 'html' => {
@@ -212,7 +212,7 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
       const response = await chatService.sendMessage({
         userProfile,
         message: currentInput,
-        language,
+        language: selectedLanguage,
       });
 
       if (response.success && response.data) {
@@ -594,7 +594,7 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={language === 'hi' ? 'अपना सवाल पूछें...' : 'Ask your financial question...'}
+                placeholder={selectedLanguage === 'hi' ? 'अपना सवाल पूछें...' : 'Ask your financial question...'}
                 className="resize-none"
                 disabled={isTyping}
               />
@@ -616,14 +616,14 @@ export const ChatInterface = ({ userProfile, language }: ChatInterfaceProps) => 
               className="px-6"
             >
               <Send className="h-4 w-4 mr-2" />
-              {language === 'hi' ? 'भेजें' : 'Send'}
+              {selectedLanguage === 'hi' ? 'भेजें' : 'Send'}
             </Button>
           </div>
           
           {isListening && (
             <div className="mt-2 text-center">
               <Badge variant="destructive" className="animate-pulse">
-                🎤 {language === 'hi' ? 'सुन रहा है...' : 'Listening...'}
+                🎤 {selectedLanguage === 'hi' ? 'सुन रहा है...' : 'Listening...'}
               </Badge>
             </div>
           )}

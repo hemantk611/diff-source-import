@@ -52,7 +52,7 @@ const Chatbot = () => {
         {/* Chat Interface */}
         <ChatInterface 
           userProfile={userProfile}
-          language={selectedLanguage}
+          selectedLanguage={selectedLanguage}
         />
       </div>
     </div>
